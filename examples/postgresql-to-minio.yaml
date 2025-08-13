@@ -1,0 +1,80 @@
+# This is an example CronJob that backs up a postgresql database to
+# an S3-compatible Minio data store, using static credentials from a
+# Kubernetes secret.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    k8s-app: postgresql-to-minio
+  name: daily-backup-to-minio
+spec:
+  # Run at 01:13 AM each day
+  schedule: 13 01 * * *
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            k8s-app: postgresql-to-minio
+        spec:
+          containers:
+          - name: backup
+            image: ghcr.io/gatenlp/postgresql-backup-rclone:latest
+            imagePullPolicy: Always
+            env:
+            # Postgresql connection parameters
+            - name: PGHOST
+              value: example-postgresql
+            - name: PGUSER
+              value: dbuser
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: postgres-credentials
+            # Name of the database or databases that we want to back up
+            - name: BACKUP_DATABASES
+              value: example_db
+
+            # Data store type is S3, provider is Minio
+            - name: RCLONE_CONFIG_STORE_TYPE
+              value: s3
+            - name: RCLONE_CONFIG_STORE_PROVIDER
+              value: Minio
+            # Upload the backups to my-backup-bucket, under the "daily" folder
+            - name: UPLOAD_PREFIX
+              value: my-backup-bucket/daily
+            # Use the AWS SDK standard credential chain and config variables
+            - name: RCLONE_CONFIG_STORE_ENV_AUTH
+              value: "true"
+            # We know the bucket exists, so don't need to check
+            - name: RCLONE_S3_NO_CHECK_BUCKET
+              value: "true"
+            # Don't double check uploads after completion - this is necessary if
+            # our credentials are "write-only" (allowing put but not get)
+            - name: RCLONE_S3_NO_HEAD
+              value: "true"
+
+            # AWS standard settings for credentials
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: access-key-id
+                  name: backup-credentials
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: secret-key
+                  name: backup-credentials
+            # Use a custom S3 endpoint
+            - name: AWS_ENDPOINT_URL_S3
+              value: https://myminio.example.com:9000
+            - name: AWS_REGION
+              value: us-east-1
+
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 30
+

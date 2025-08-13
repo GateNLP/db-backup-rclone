@@ -1,0 +1,62 @@
+# This is an example CronJob that backs up a postgresql database to
+# Azure Blob Storage, using Azure Workload Identity authentication.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    k8s-app: postgresql-to-azure
+  name: daily-backup-to-azure
+spec:
+  # Run at 01:13 AM each day
+  schedule: 13 01 * * *
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            k8s-app: postgresql-to-azure
+            # Inject the configuration to use workload identity authentication
+            azure.workload.identity/use: "true"
+        spec:
+          # Specify the service account, which must itself have the appropriate
+          # client ID and tenant ID annotations
+          serviceAccountName: db-backups
+          containers:
+          - name: backup
+            image: ghcr.io/gatenlp/postgresql-backup-rclone:latest
+            imagePullPolicy: Always
+            env:
+            # Postgresql connection parameters
+            - name: PGHOST
+              value: example-postgresql
+            - name: PGUSER
+              value: dbuser
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: postgres-credentials
+            # Name of the database or databases that we want to back up
+            - name: BACKUP_DATABASES
+              value: example_db
+
+            # Data store type is Azure Blob Storage
+            - name: RCLONE_CONFIG_STORE_TYPE
+              value: azureblob
+            # Use the storage account named "exampledbbackups"
+            - name: RCLONE_CONFIG_STORE_ACCOUNT
+              value: exampledbbackups
+            # Upload the backups to the "dbbackup" container
+            - name: UPLOAD_PREFIX
+              value: dbbackup
+            # Use the Azure SDK standard credential chain and config variables,
+            # which includes support for workload identity
+            - name: RCLONE_CONFIG_STORE_ENV_AUTH
+              value: "true"
+
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 30
+

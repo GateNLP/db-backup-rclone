@@ -1,0 +1,78 @@
+# This is an example CronJob that backs up a postgresql database to
+# an SFTP server, using a private key file and known_hosts file mounted
+# from a secret.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    k8s-app: postgresql-to-sftp
+  name: daily-backup-to-sftp
+spec:
+  # Run at 01:13 AM each day
+  schedule: 13 01 * * *
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            k8s-app: postgresql-to-sftp
+        spec:
+          containers:
+          - name: backup
+            image: ghcr.io/gatenlp/postgresql-backup-rclone:latest
+            imagePullPolicy: Always
+            env:
+            # Postgresql connection parameters
+            - name: PGHOST
+              value: example-postgresql
+            - name: PGUSER
+              value: dbuser
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: postgres-credentials
+            # Name of the database or databases that we want to back up
+            - name: BACKUP_DATABASES
+              value: example_db
+            # Path on the server under which we want to save the backups.
+            # The dbuser must have write permission in this location.
+            - name: UPLOAD_PREFIX
+              value: /mnt/db-backups/daily
+
+            # Data store type is sftp
+            - name: RCLONE_CONFIG_STORE_TYPE
+              value: sftp
+            - name: RCLONE_CONFIG_STORE_SHELL_TYPE
+              value: none
+            # SFTP server name
+            - name: RCLONE_CONFIG_STORE_HOST
+              value: backups.example.com
+            # Username and key file for authentication
+            - name: RCLONE_CONFIG_STORE_USER
+              value: backupuser
+            - name: RCLONE_CONFIG_STORE_KEY_FILE
+              value: /ssh/key
+            # known_hosts file, used for the client to authenticate the server
+            - name: RCLONE_CONFIG_STORE_KNOWN_HOSTS_FILE
+              value: /ssh/known_hosts
+
+            # mount the key and known_hosts files at the required location
+            volumeMounts:
+            - mountPath: /ssh
+              name: ssh
+              readOnly: true
+
+          # Define the volume with the key and known_hosts files loaded from
+          # a secret
+          volumes:
+          - name: ssh
+            secret:
+              secretName: ssh-credentials
+
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 30
+

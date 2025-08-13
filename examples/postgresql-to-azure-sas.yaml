@@ -1,0 +1,77 @@
+# This is an example CronJob that backs up a postgresql database to
+# Azure Blob Storage, using a SAS token from a secret for authentication.
+# It also shows how to encrypt the files before upload using an SSH key,
+# and how to use a custom file name pattern to split the backups into
+# folders by month.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    k8s-app: postgresql-to-azure
+  name: daily-backup-to-azure
+spec:
+  # Run at 01:13 AM each day
+  schedule: 13 01 * * *
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            k8s-app: postgresql-to-azure
+        spec:
+          containers:
+          - name: backup
+            image: ghcr.io/gatenlp/postgresql-backup-rclone:latest
+            imagePullPolicy: Always
+            env:
+            # Postgresql connection parameters
+            - name: PGHOST
+              value: example-postgresql
+            - name: PGUSER
+              value: dbuser
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: postgres-credentials
+            # Name of the database or databases that we want to back up
+            - name: BACKUP_DATABASES
+              value: example_db
+            # Split up the backup files into folders by month - this will
+            # create files named e.g.
+            # 2025/08/example_db_2025-08-12T01:13:04.sql.gz.age
+            - name: BACKUP_FILE_NAME
+              value: "%Y/%m/${DB}_%Y-%m-%dT%H-%M-%S"
+
+            # The public key file to use for encryption
+            - name: ENCRYPT_RECIPIENTS_FILE
+              value: /encryption/id_ed25519.pub
+
+            # Data store type is Azure Blob Storage
+            - name: RCLONE_CONFIG_STORE_TYPE
+              value: azureblob
+            # Use a SAS token for authentication
+            - name: RCLONE_CONFIG_STORE_SAS_URL
+              valueFrom:
+                secretKeyRef:
+                  key: sas-url
+                  name: azure-backup-credentials
+            # Upload the backups to the "dbbackup" container - this MUST
+            # match the container that is named in the SAS URL.
+            - name: UPLOAD_PREFIX
+              value: dbbackup
+
+            volumeMounts:
+            - mountPath: /encryption
+              name: encryption-key
+
+          volumes:
+          - name: encryption-key
+            secret:
+              secretName: backup-public-key
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 30
+
