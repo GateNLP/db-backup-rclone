@@ -1,7 +1,6 @@
 #!/bin/sh
 
 set -eo pipefail
-set -x
 
 function do_dump_all() {
   pg_dumpall "$@"
