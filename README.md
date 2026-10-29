@@ -43,6 +43,16 @@ The [`pg_dump`](https://www.postgresql.org/docs/current/app-pgdump.html) tool ca
 
 Any additional command-line options passed to the container will be forwarded unchanged to `pg_dump` or `pg_dumpall` as appropriate.
 
+PostgreSQL is quite particular about matching the major version number of `pg_dump` to that of the database server it is dumping from.  Generally a later version `pg_dump` will back up _from_ an earlier version of the server, but the dump files may not be restorable _to_ the original server version.  For example, `pg_dump` version 17 will back up from a v16 PostgreSQL server, but the resulting dump can only be loaded back into v17 or later.
+
+We build different versions of the `ghcr.io/gatenlp/postgresql-backup-rclone` image with different tags for different `pg_dump` versions, and for maximum compatibility you should use the one that matches your server:
+
+| Server version | Backup image                                                        |
+|----------------|---------------------------------------------------------------------|
+| 18.x           | `ghcr.io/gatenlp/postgresql-backup-rclone:latest` or `:latest-pg18` |
+| 17.x           | `ghcr.io/gatenlp/postgresql-backup-rclone:latest-pg17`              |
+| 16.x           | `ghcr.io/gatenlp/postgresql-backup-rclone:latest-pg16`              |
+
 ### MariaDB / MySQL
 
 The [`mariadb-dump`](https://mariadb.com/docs/server/clients-and-utilities/backup-restore-and-import-clients/mariadb-dump) tool can take configuration from [environment variables](https://mariadb.com/docs/server/server-management/install-and-upgrade-mariadb/configuring-mariadb/mariadb-environment-variables), option files, and/or command-line parameters.  In most cases you will probably use the following environment variables or parameters:

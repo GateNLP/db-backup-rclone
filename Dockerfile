@@ -1,4 +1,4 @@
-FROM alpine:3.22 AS base
+FROM alpine:3.24 AS base
 ARG TARGETARCH
 # Install rclone and create a temporary dir for the backup files
 ARG VERSION_RCLONE=current
@@ -22,7 +22,9 @@ COPY common.sh /common.sh
 
 FROM base AS postgresql
 
-RUN --mount=type=cache,target=/etc/apk/cache apk add postgresql17-client
+ARG VERSION_DB=17
+
+RUN --mount=type=cache,target=/etc/apk/cache apk add postgresql${VERSION_DB}-client
 
 COPY postgresql/backup.sh /backup.sh
 

@@ -3,7 +3,7 @@ variable "DBBR_REGISTRY" {
 }
 
 variable VERSION_RCLONE {
-  default = "v1.70.3"
+  default = "v1.75.2"
 }
 
 variable TAGS {
@@ -27,12 +27,34 @@ target "default" {
   context = "."
   dockerfile = "Dockerfile"
   matrix = {
-    db = ["postgresql", "mariadb"]
+    db = [
+      {
+        kind = "postgresql"
+        ver = "16"
+        tails = ["-pg16"]
+      },
+      {
+        kind = "postgresql"
+        ver = "17"
+        tails = ["-pg17"]
+      },
+      {
+        kind = "postgresql"
+        ver = "18"
+        tails = ["-pg18", ""]
+      },
+      {
+        kind = "mariadb"
+        ver = ""
+        tails = [""]
+      }
+    ]
   }
-  name = db
-  target = db
-  tags = [for tag in TAGS: "${DBBR_REGISTRY}${db}-backup-rclone:${tag}"]
+  name = "${db.kind}${db.ver}"
+  target = db.kind
+  tags = flatten([for tag in TAGS: [for tail in db.tails: "${DBBR_REGISTRY}${db.kind}-backup-rclone:${tag}${tail}"]])
   args = {
     VERSION_RCLONE = VERSION_RCLONE
+    VERSION_DB = db.ver
   }
 }
