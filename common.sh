@@ -92,7 +92,7 @@ function do_backup() {
 
     if [ -n "${BACKUP_FILE_NAME}" ]; then
       DEST_FILE_NO_GZ="${BACKUP_FILE_NAME%.gz}"
-      DEST_FILE_PATTERN="${BACKUP_FILE_NAME%.sql}.sql.gz"
+      DEST_FILE_PATTERN="${DEST_FILE_NO_GZ%.sql}.sql.gz"
     fi
 
     DEST_FILE=$( date -r /tmp/started-at +"$DEST_FILE_PATTERN" | sed -e 's/[^a-zA-Z0-9_.\/]\+/-/g' -e 's/^-\|-$//g' )
@@ -111,7 +111,7 @@ function do_backup() {
 
     if [ -n "${BACKUP_FILE_NAME}" ]; then
       DEST_FILE_NO_GZ="${BACKUP_FILE_NAME%.gz}"
-      DEST_FILE_PATTERN="${BACKUP_FILE_NAME%.sql}.sql.gz"
+      DEST_FILE_PATTERN="${DEST_FILE_NO_GZ%.sql}.sql.gz"
     fi
     case "$DEST_FILE_PATTERN" in
       *\$DB*|*\$\{DB\}*)
